@@ -1,0 +1,35 @@
+{
+	"metadata": {
+		"version": 4.4,
+		"type": "Object",
+		"generator": "Object3D.toJSON"
+	},
+	"geometries": [
+		{
+			"uuid": "D09A2280-8331-42F1-B336-6135DD2D366D",
+			"type": "CylinderGeometry",
+			"radiusTop": 0,
+			"radiusBottom": 19.98,
+			"height": 60,
+			"radialSegments": 32,
+			"heightSegments": 1,
+			"openEnded": false
+		}],
+	"materials": [
+		{
+			"uuid": "0C614A6A-22DA-4980-8DD8-F128F93F21E5",
+			"type": "MeshPhongMaterial",
+			"color": 16777215,
+			"emissive": 0,
+			"specular": 1118481,
+			"shininess": 30
+		}],
+	"object": {
+		"uuid": "3570E819-3EAF-47E3-8B78-29EDEC83FBAC",
+		"type": "Mesh",
+		"name": "Cylinder 2",
+		"matrix": [1,0,0,0,0,0.07073719799518585,0.9974949955940247,0,0,-0.9974949955940247,0.07073719799518585,0,0,0,0,1],
+		"geometry": "D09A2280-8331-42F1-B336-6135DD2D366D",
+		"material": "0C614A6A-22DA-4980-8DD8-F128F93F21E5"
+	}
+}
