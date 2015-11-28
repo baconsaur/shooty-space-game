@@ -12,8 +12,6 @@ function initGame() {
 	players = [];
 	bullets = [];
 	enemies = [];
-	enemyBoxes = [];
-	playerBoxes = [];
 	spawnCount = 600;
 	score = 0;
 	UI.innerText = "Score: " + score;
@@ -28,6 +26,7 @@ function initGame() {
 
 function Ship(playerId) {
 	this.playerId = playerId;
+	this.alive = true;
 	this.speed = 0.005;
 	this.velocity = new THREE.Vector3(0,0,0);
 	this.geometry = new THREE.CubeGeometry( 0.5,0.5,0.5 ); 
@@ -65,7 +64,12 @@ function Ship(playerId) {
 	this.bbox = new THREE.BoundingBoxHelper(this.mesh);
 	scene.add(this.bbox);
 	this.bbox.update();
-	playerBoxes.push(this.bbox);
+	this.destroy = function() {
+		this.velocity.set(0,0,0);
+		scene.remove(this.mesh);
+		scene.remove(this.bbox);
+		this.alive = false;
+	};
 }
 
 function Bullet(player, geometry, material){
@@ -74,6 +78,10 @@ function Bullet(player, geometry, material){
 	this.mesh = new THREE.Mesh(this.geometry, this.material);
 	this.mesh.position.copy(player.mesh.position);
 	this.speed = 0.1;
+	this.destroy = function() {
+		scene.remove(this.mesh);
+		delete this;
+	}
 }
 
 function Enemy() {
@@ -85,12 +93,16 @@ function Enemy() {
 	this.bbox = new THREE.BoundingBoxHelper(this.mesh);
 	scene.add(this.bbox);
 	this.bbox.update();
-	enemyBoxes.push(this.bbox);
+	this.destroy = function() {
+		scene.remove(this.mesh);
+		scene.remove(this.bbox);
+		enemies.splice(enemies.indexOf(this),1);
+	};
 	this.movement = function() {
 		this.mesh.translateX(-this.speed);
 		if (this.mesh.position.x <= -10)
-			scene.remove(this.mesh);
-		collide(this.mesh);
+			this.destroy();
+		collide(this, bullets);
 	};
 }
 
@@ -100,22 +112,12 @@ function spawnEnemy() {
 	enemies.push(enemy);
 }
 
-function collide(box1, box2){
-	for (var i in box1)
-		for (var j in box2)
-			if (box1[i].box.isIntersectionBox(box2[j].box))
-				console.log("hit!");
-		/*	for (var i in object.geometry.vertices)
-	{       
-		var meshVertex = object.geometry.vertices[i].clone();
-		var worldVertex = meshVertex.applyMatrix4(object.matrix);
-		var direction = worldVertex.sub( object.position );
-
-		var ray = new THREE.Raycaster( object.position, direction.clone().normalize() );
-		var collisions = ray.intersectObjects( bullets );
-		if ( collisions.length > 0 && collisions[0].distance < direction.length() ) 
-			console.log("hit!");
-	}*/
+function collide(ship, threat){
+		for (var i in threat)
+			if (ship.bbox.box.containsPoint(threat[i].mesh.position) || threat.bbox && ship.bbox.box.isIntersectionBox(threat[i].bbox.box))
+				ship.destroy();
+		if (!players[0].alive && !players[1].alive)
+			reset();
 }
 
 var light1 = new THREE.AmbientLight( 0x404040 );
@@ -172,10 +174,11 @@ function move(player, gamepad){
 	for (var i in bullets){
 		bullets[i].mesh.translateX(bullets[i].speed);	
 		if (bullets[i].mesh.position.x > 10) {
-			scene.remove(bullets[i].mesh);
-			delete bullets[i];
+			bullets[i].destroy();
 		}
 	}
+
+	collide(player, enemies);
 
 	if (!spawnCount) {
 		spawnEnemy();
@@ -183,13 +186,23 @@ function move(player, gamepad){
 	} else
 		spawnCount--;
 	
-	for (var enemy in enemies)	
+	for (var enemy in enemies){	
 		enemies[enemy].movement();
-	for (var i in enemyBoxes)
-		enemyBoxes[i].update();
-	for (var i in playerBoxes)
-		playerBoxes[i].update();
-	collide(playerBoxes, enemyBoxes);
+		if (enemies[enemy])
+			enemies[enemy].bbox.update();
+	}
+	for (var box in players)
+		players[box].bbox.update();
+}
+
+function reset(){
+	for (var i in enemies)
+		enemies[i].destroy();
+	for (var j in bullets)
+		bullets[j].destroy();
+	for (var k in players)
+		delete players[k];
+	initGame();
 }
 
 function updateScore(){
