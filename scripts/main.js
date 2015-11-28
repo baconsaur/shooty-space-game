@@ -11,6 +11,10 @@ document.body.appendChild(UI);
 function initGame() {
 	players = [];
 	bullets = [];
+	enemies = [];
+	enemyBoxes = [];
+	playerBoxes = [];
+	spawnCount = 600;
 	score = 0;
 	UI.innerText = "Score: " + score;
 	switchCooldown = 0;
@@ -58,6 +62,10 @@ function Ship(playerId) {
 		score += 10;
 		updateScore();
 	};
+	this.bbox = new THREE.BoundingBoxHelper(this.mesh);
+	scene.add(this.bbox);
+	this.bbox.update();
+	playerBoxes.push(this.bbox);
 }
 
 function Bullet(player, geometry, material){
@@ -66,6 +74,48 @@ function Bullet(player, geometry, material){
 	this.mesh = new THREE.Mesh(this.geometry, this.material);
 	this.mesh.position.copy(player.mesh.position);
 	this.speed = 0.1;
+}
+
+function Enemy() {
+	this.speed = 0.02;
+	this.geometry = new THREE.IcosahedronGeometry(0.5, 0);
+	this.material = new THREE.MeshPhongMaterial({color:0x404040});
+	this.mesh = new THREE.Mesh(this.geometry, this.material);
+	this.mesh.position.set(10, Math.random()* 6 - 3, Math.floor(Math.random() * 2 - 1));	
+	this.bbox = new THREE.BoundingBoxHelper(this.mesh);
+	scene.add(this.bbox);
+	this.bbox.update();
+	enemyBoxes.push(this.bbox);
+	this.movement = function() {
+		this.mesh.translateX(-this.speed);
+		if (this.mesh.position.x <= -10)
+			scene.remove(this.mesh);
+		collide(this.mesh);
+	};
+}
+
+function spawnEnemy() {
+	var enemy = new Enemy();
+	scene.add(enemy.mesh);
+	enemies.push(enemy);
+}
+
+function collide(box1, box2){
+	for (var i in box1)
+		for (var j in box2)
+			if (box1[i].box.isIntersectionBox(box2[j].box))
+				console.log("hit!");
+		/*	for (var i in object.geometry.vertices)
+	{       
+		var meshVertex = object.geometry.vertices[i].clone();
+		var worldVertex = meshVertex.applyMatrix4(object.matrix);
+		var direction = worldVertex.sub( object.position );
+
+		var ray = new THREE.Raycaster( object.position, direction.clone().normalize() );
+		var collisions = ray.intersectObjects( bullets );
+		if ( collisions.length > 0 && collisions[0].distance < direction.length() ) 
+			console.log("hit!");
+	}*/
 }
 
 var light1 = new THREE.AmbientLight( 0x404040 );
@@ -126,6 +176,20 @@ function move(player, gamepad){
 			delete bullets[i];
 		}
 	}
+
+	if (!spawnCount) {
+		spawnEnemy();
+		spawnCount = Math.floor(Math.random() * 481 + 120);
+	} else
+		spawnCount--;
+	
+	for (var enemy in enemies)	
+		enemies[enemy].movement();
+	for (var i in enemyBoxes)
+		enemyBoxes[i].update();
+	for (var i in playerBoxes)
+		playerBoxes[i].update();
+	collide(playerBoxes, enemyBoxes);
 }
 
 function updateScore(){
@@ -136,7 +200,7 @@ function animate() {
 	for (var i in players) {
 		var gamepad = navigator.getGamepads()[i];
 		move(players[i], gamepad);
-	}
+	}	
 	render();
 	requestAnimationFrame( animate );
 }
@@ -144,5 +208,6 @@ function animate() {
 function render() {
 	renderer.render( scene, camera );
 }
+
 
 initGame();
