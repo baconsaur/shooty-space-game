@@ -5,15 +5,36 @@ var renderer = new THREE.WebGLRenderer();
 renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
 
+var UI = document.createElement('div');
+document.body.appendChild(UI);
+
+function initGame() {
+	players = [];
+	bullets = [];
+	score = 0;
+	UI.innerText = "Score: " + score;
+	switchCooldown = 0;
+	for (var i=0;i<2;i++) {
+		var ship = new Ship(i);
+		players.push(ship);
+		scene.add(players[i].mesh);
+	}
+	animate();
+}
+
 function Ship(playerId) {
 	this.playerId = playerId;
 	this.speed = 0.005;
 	this.velocity = new THREE.Vector3(0,0,0);
 	this.geometry = new THREE.CubeGeometry( 0.5,0.5,0.5 ); 
-	this.material = new THREE.MeshPhongMaterial( { color: 0x909090 } );
+	if (playerId === 0)
+		this.material = new THREE.MeshPhongMaterial( { color: 0x5050B0 } );
+	else
+		this.material = new THREE.MeshPhongMaterial( { color: 0x50B050 } );
 	this.mesh = new THREE.Mesh( this.geometry, this.material );
 	this.track = playerId;
 	this.mesh.position.set(0, playerId, -playerId);
+	this.cooldown = 0;
 	this.switchTrack = function () {
 		var position = this.mesh.position;
 		if (this.track === 0)
@@ -21,11 +42,27 @@ function Ship(playerId) {
 		else
 			this.track = 0;
 	};
+	this.special = function(){
+		var geometry;
+		var material;
+		if (this.playerId === 0) {
+			geometry = new THREE.SphereGeometry(0.15, 32, 32);
+			material = new THREE.MeshPhongMaterial({color:0xFF0000});
+		} else {
+			geometry = new THREE.SphereGeometry(0.15, 32, 32);
+			material = new THREE.MeshPhongMaterial({color:0xFFFF00});
+		}
+		var special = new Bullet(this, geometry, material);
+		scene.add(special.mesh);
+		bullets.push(special);
+		score += 10;
+		updateScore();
+	};
 }
 
-function Bullet(player){
-	this.geometry = new THREE.CubeGeometry(0.1,0.1,0.1);
-	this.material = new THREE.MeshPhongMaterial({color:0xFFFFFF});
+function Bullet(player, geometry, material){
+	this.geometry = geometry || new THREE.CubeGeometry(0.1,0.1,0.1);
+	this.material = material || new THREE.MeshPhongMaterial({color:0xFFFFFF});
 	this.mesh = new THREE.Mesh(this.geometry, this.material);
 	this.mesh.position.copy(player.mesh.position);
 	this.speed = 0.1;
@@ -51,13 +88,15 @@ function checkGamePad(player, gamepad) {
 	else if (gamepad.axes[1] <= 0.5 || gamepad.axes[1] >= -0.5)
 		player.velocity.y = 0;
 
-	if (gamepad.axes[5] === 1) {
+	if (gamepad.buttons[1].pressed && !player.cooldown) {
+		player.special();
+		player.cooldown = 60;
+	} else if (gamepad.axes[5] === 1 && !player.cooldown) {
 		var bullet = new Bullet(player);
 		scene.add(bullet.mesh);
 		bullets.push(bullet);
-	} else if (gamepad.buttons[1].pressed)
-		console.log("weapon 2");
-	else if (gamepad.buttons[0].pressed)
+		player.cooldown = 20;
+  }	else if (gamepad.buttons[0].pressed)
 		if (switchCooldown === 0){
 			for (var i in players)
 				players[i].switchTrack();
@@ -66,6 +105,11 @@ function checkGamePad(player, gamepad) {
 }
 
 function move(player, gamepad){
+	if (player.cooldown > 0)
+		player.cooldown--;
+	if (switchCooldown > 0)
+		switchCooldown--;
+
 	checkGamePad(player, gamepad);
 	for (var axis in player.mesh.position)
 		if (player.mesh.position[axis] <= -2.5 && player.velocity[axis] < 0 || player.mesh.position[axis] >= 3.3 && player.velocity[axis] > 0)
@@ -76,7 +120,6 @@ function move(player, gamepad){
 	player.mesh.position.setZ(-player.track);
 
 	for (var i in bullets){
-		console.log(bullets[i].mesh.position.x);
 		bullets[i].mesh.translateX(bullets[i].speed);	
 		if (bullets[i].mesh.position.x > 10) {
 			scene.remove(bullets[i].mesh);
@@ -85,14 +128,16 @@ function move(player, gamepad){
 	}
 }
 
+function updateScore(){
+	UI.innerText = "Score: " + score;
+}
+
 function animate() {
 	for (var i in players) {
 		var gamepad = navigator.getGamepads()[i];
 		move(players[i], gamepad);
 	}
 	render();
-	if (switchCooldown > 0)
-		switchCooldown--;
 	requestAnimationFrame( animate );
 }
 
@@ -100,14 +145,4 @@ function render() {
 	renderer.render( scene, camera );
 }
 
-var players = [];
-var bullets = [];
-
-for (var i=0;i<2;i++) {
-	var ship = new Ship(i);
-	players.push(ship);
-	scene.add(players[i].mesh);
-}
-var switchCooldown = 0;
-var player = players[0];
-animate();
+initGame();
