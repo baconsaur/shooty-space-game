@@ -1,6 +1,9 @@
 var scene = new THREE.Scene();
 var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 
+var requestId = 0;
+var difficulty = 0;
+
 var renderer = new THREE.WebGLRenderer();
 renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
@@ -14,6 +17,7 @@ function initGame() {
 	enemies = [];
 	spawnCount = 600;
 	score = 0;
+	difficulty = 0;
 	UI.innerText = "Score: " + score;
 	switchCooldown = 0;
 	for (var i=0;i<2;i++) {
@@ -65,7 +69,6 @@ function Ship(playerId) {
 	this.destroy = function() {
 		scene.remove(this.mesh);
 		scene.remove(this.bbox);
-		this.alive = false;
 	};
 }
 
@@ -98,6 +101,7 @@ function Enemy() {
 		this.type = 0;
 		color = 0x404040;
 	}
+	this.alive = true;
 	this.speed = 0.02;
 	this.geometry = new THREE.IcosahedronGeometry(0.5, 0);
 	this.material = new THREE.MeshPhongMaterial({color:color});
@@ -112,9 +116,11 @@ function Enemy() {
 		enemies.splice(enemies.indexOf(this),1);
 		if (kill)
 			updateScore(10);
+		else
+			updateScore(-10);
 	};
 	this.movement = function() {
-		this.mesh.translateX(-this.speed);
+		this.mesh.translateX(-this.speed - (difficulty * 0.005));
 		if (this.mesh.position.x <= -10)
 			this.destroy();
 		collide(this, bullets);
@@ -128,18 +134,24 @@ function spawnEnemy() {
 }
 
 function collide(ship, threat){
-		for (var i in threat){
-			if (ship.bbox.box.containsPoint(threat[i].mesh.position) || threat.bbox && ship.bbox.box.isIntersectionBox(threat[i].bbox.box)) {
-				if (ship.type > 0 && threat[i].special !== ship.type)
+	var hit = false;
+	for (var i in threat){
+		if (ship.bbox.box.containsPoint(threat[i].mesh.position))
+			hit = true;
+		else if (threat[i].bbox && ship.bbox.box.isIntersectionBox(threat[i].bbox.box))
+			hit = true;
+
+		if (hit)
+			if (ship.type > 0 && threat[i].special !== ship.type)
 					return;
-				else {
+			else {
+				if (ship.alive) {
+					ship.alive = false;
 					threat[i].destroy();
 					ship.destroy(true);
 				}
 			}
 		}
-		if (!players[0].alive && !players[1].alive)
-			reset();
 }
 
 var light1 = new THREE.AmbientLight( 0x404040 );
@@ -152,31 +164,33 @@ scene.add( light1, light2, light3 );
 camera.position.z = 5;
 
 function checkGamePad(player, gamepad) {
-	if (gamepad.axes[0] > 0.5 || gamepad.axes[0] < -0.5)
-		player.velocity.x += gamepad.axes[0] * player.speed;
-	else if (gamepad.axes[0] <= 0.5 || gamepad.axes[0] >= -0.5)
-		player.velocity.x = 0;
+	if (player.alive) {
+		if (gamepad.axes[0] > 0.5 || gamepad.axes[0] < -0.5)
+			player.velocity.x += gamepad.axes[0] * player.speed;
+		else if (gamepad.axes[0] <= 0.5 || gamepad.axes[0] >= -0.5)
+			player.velocity.x = 0;
 
-	if (gamepad.axes[1] > 0.5 || gamepad.axes[1] < -0.5)
-		player.velocity.y -= gamepad.axes[1] * player.speed;
-	else if (gamepad.axes[1] <= 0.5 || gamepad.axes[1] >= -0.5)
-		player.velocity.y = 0;
+		if (gamepad.axes[1] > 0.5 || gamepad.axes[1] < -0.5)
+			player.velocity.y -= gamepad.axes[1] * player.speed;
+		else if (gamepad.axes[1] <= 0.5 || gamepad.axes[1] >= -0.5)
+			player.velocity.y = 0;
 
-	if (gamepad.buttons[1].pressed && !player.cooldown) {
-		player.special();
-		player.cooldown = 60;
-	} else if (gamepad.axes[5] === 1 && !player.cooldown) {
+		if (gamepad.buttons[1].pressed && !player.cooldown) {
+			player.special();
+			player.cooldown = 70;
+		} else if (gamepad.axes[5] === 1 && !player.cooldown) {
 			if (switchCooldown === 0){
 				for (var i in players)
 					players[i].switchTrack();
 				switchCooldown = 120;
-		}
-  }	else if (gamepad.buttons[0].pressed){
+			}
+		}	else if (gamepad.buttons[0].pressed && !player.cooldown){
 			var bullet = new Bullet(player);
 			scene.add(bullet.mesh);
 			bullets.push(bullet);
 			player.cooldown = 20;
 		}
+	}
 }
 
 function move(player, gamepad){
@@ -201,11 +215,9 @@ function move(player, gamepad){
 		}
 	}
 
-	collide(player, enemies);
-
 	if (!spawnCount) {
 		spawnEnemy();
-		spawnCount = Math.floor(Math.random() * 481 + 120);
+		spawnCount = Math.floor(Math.random() * 481 + 120 - (50 * difficulty));
 	} else
 		spawnCount--;
 	
@@ -214,14 +226,17 @@ function move(player, gamepad){
 		if (enemies[enemy])
 			enemies[enemy].bbox.update();
 	}
-	for (var box in players)
-		players[box].bbox.update();
+	
+	player.bbox.update();
+	
+	if (player.alive)
+		collide(player, enemies);
 }
 
 function reset(){
-	for (var i in enemies)
+	for (var i=0;i<enemies.length;i++)
 		enemies[i].destroy();
-	for (var j in bullets)
+	for (var j=0;j<bullets.lenght;j++)
 		bullets[j].destroy();
 	for (var k in players)
 		delete players[k];
@@ -231,6 +246,12 @@ function reset(){
 function updateScore(points){
 	if (points)
 		score += points;
+	
+	if (score < 0)
+		score = 0;
+	else if (score % 100 === 0)
+		difficulty++;
+
 	UI.innerText = "Score: " + score;
 }
 
@@ -239,13 +260,18 @@ function animate() {
 		var gamepad = navigator.getGamepads()[i];
 		move(players[i], gamepad);
 	}	
+	if (!players[0].alive && !players[1].alive){
+		cancelAnimationFrame(requestId);
+		reset();
+		return;
+	}
+
 	render();
-	requestAnimationFrame( animate );
+	requestId = requestAnimationFrame( animate );
 }
 
 function render() {
 	renderer.render( scene, camera );
 }
-
 
 initGame();
