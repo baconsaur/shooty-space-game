@@ -23,6 +23,14 @@ function Ship(playerId) {
 	};
 }
 
+function Bullet(player){
+	this.geometry = new THREE.CubeGeometry(0.1,0.1,0.1);
+	this.material = new THREE.MeshPhongMaterial({color:0xFFFFFF});
+	this.mesh = new THREE.Mesh(this.geometry, this.material);
+	this.mesh.position.copy(player.mesh.position);
+	this.speed = 0.1;
+}
+
 var light1 = new THREE.AmbientLight( 0x404040 );
 var light2 = new THREE.PointLight( 0x404020, 7, 120 );
 var light3 = new THREE.PointLight( 0x4540A0, 3, 120 );
@@ -33,7 +41,6 @@ scene.add( light1, light2, light3 );
 camera.position.z = 5;
 
 function checkGamePad(player, gamepad) {
-	if (gamepad){
 	if (gamepad.axes[0] > 0.5 || gamepad.axes[0] < -0.5)
 		player.velocity.x += gamepad.axes[0] * player.speed;
 	else if (gamepad.axes[0] <= 0.5 || gamepad.axes[0] >= -0.5)
@@ -44,9 +51,11 @@ function checkGamePad(player, gamepad) {
 	else if (gamepad.axes[1] <= 0.5 || gamepad.axes[1] >= -0.5)
 		player.velocity.y = 0;
 
-	if (gamepad.axes[5] === 1)
-		console.log("weapon 1");
-	else if (gamepad.buttons[1].pressed)
+	if (gamepad.axes[5] === 1) {
+		var bullet = new Bullet(player);
+		scene.add(bullet.mesh);
+		bullets.push(bullet);
+	} else if (gamepad.buttons[1].pressed)
 		console.log("weapon 2");
 	else if (gamepad.buttons[0].pressed)
 		if (switchCooldown === 0){
@@ -55,9 +64,8 @@ function checkGamePad(player, gamepad) {
 			switchCooldown = 120;
 		}
 }
-}
 
-function moveShip(player, gamepad){
+function move(player, gamepad){
 	checkGamePad(player, gamepad);
 	for (var axis in player.mesh.position)
 		if (player.mesh.position[axis] <= -2.5 && player.velocity[axis] < 0 || player.mesh.position[axis] >= 3.3 && player.velocity[axis] > 0)
@@ -66,12 +74,21 @@ function moveShip(player, gamepad){
 	player.mesh.translateX(player.velocity.x);
 	player.mesh.translateY(player.velocity.y);
 	player.mesh.position.setZ(-player.track);
+
+	for (var i in bullets){
+		console.log(bullets[i].mesh.position.x);
+		bullets[i].mesh.translateX(bullets[i].speed);	
+		if (bullets[i].mesh.position.x > 10) {
+			scene.remove(bullets[i].mesh);
+			delete bullets[i];
+		}
+	}
 }
 
 function animate() {
 	for (var i in players) {
 		var gamepad = navigator.getGamepads()[i];
-		moveShip(players[i], gamepad);
+		move(players[i], gamepad);
 	}
 	render();
 	if (switchCooldown > 0)
@@ -84,6 +101,8 @@ function render() {
 }
 
 var players = [];
+var bullets = [];
+
 for (var i=0;i<2;i++) {
 	var ship = new Ship(i);
 	players.push(ship);
