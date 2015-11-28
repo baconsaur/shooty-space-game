@@ -55,24 +55,25 @@ function Ship(playerId) {
 			geometry = new THREE.SphereGeometry(0.15, 32, 32);
 			material = new THREE.MeshPhongMaterial({color:0xFFFF00});
 		}
-		var special = new Bullet(this, geometry, material);
+		var special = new Bullet(this, geometry, material, this.playerId);
 		scene.add(special.mesh);
 		bullets.push(special);
-		score += 10;
-		updateScore();
 	};
 	this.bbox = new THREE.BoundingBoxHelper(this.mesh);
 	scene.add(this.bbox);
 	this.bbox.update();
 	this.destroy = function() {
-		this.velocity.set(0,0,0);
 		scene.remove(this.mesh);
 		scene.remove(this.bbox);
 		this.alive = false;
 	};
 }
 
-function Bullet(player, geometry, material){
+function Bullet(player, geometry, material, playerId){
+	if (typeof playerId === 'number')
+		this.special = playerId + 1;
+	else
+		this.special = 0;
 	this.geometry = geometry || new THREE.CubeGeometry(0.1,0.1,0.1);
 	this.material = material || new THREE.MeshPhongMaterial({color:0xFFFFFF});
 	this.mesh = new THREE.Mesh(this.geometry, this.material);
@@ -80,23 +81,37 @@ function Bullet(player, geometry, material){
 	this.speed = 0.1;
 	this.destroy = function() {
 		scene.remove(this.mesh);
-		delete this;
-	}
+		bullets.splice(bullets.indexOf(this),1);
+	};
 }
 
 function Enemy() {
+	var typeCheck = Math.floor(Math.random()*5);
+	var color;
+	if (typeCheck === 1) {
+		this.type = 1;
+		color = 0xFF0000;
+	} else if (typeCheck === 2) {
+		this.type = 2;
+		color = 0x0000FF;
+	} else {
+		this.type = 0;
+		color = 0x404040;
+	}
 	this.speed = 0.02;
 	this.geometry = new THREE.IcosahedronGeometry(0.5, 0);
-	this.material = new THREE.MeshPhongMaterial({color:0x404040});
+	this.material = new THREE.MeshPhongMaterial({color:color});
 	this.mesh = new THREE.Mesh(this.geometry, this.material);
 	this.mesh.position.set(10, Math.random()* 6 - 3, Math.floor(Math.random() * 2 - 1));	
 	this.bbox = new THREE.BoundingBoxHelper(this.mesh);
 	scene.add(this.bbox);
 	this.bbox.update();
-	this.destroy = function() {
+	this.destroy = function(kill) {
 		scene.remove(this.mesh);
 		scene.remove(this.bbox);
 		enemies.splice(enemies.indexOf(this),1);
+		if (kill)
+			updateScore(10);
 	};
 	this.movement = function() {
 		this.mesh.translateX(-this.speed);
@@ -113,9 +128,16 @@ function spawnEnemy() {
 }
 
 function collide(ship, threat){
-		for (var i in threat)
-			if (ship.bbox.box.containsPoint(threat[i].mesh.position) || threat.bbox && ship.bbox.box.isIntersectionBox(threat[i].bbox.box))
-				ship.destroy();
+		for (var i in threat){
+			if (ship.bbox.box.containsPoint(threat[i].mesh.position) || threat.bbox && ship.bbox.box.isIntersectionBox(threat[i].bbox.box)) {
+				if (ship.type > 0 && threat[i].special !== ship.type)
+					return;
+				else {
+					threat[i].destroy();
+					ship.destroy(true);
+				}
+			}
+		}
 		if (!players[0].alive && !players[1].alive)
 			reset();
 }
@@ -144,15 +166,16 @@ function checkGamePad(player, gamepad) {
 		player.special();
 		player.cooldown = 60;
 	} else if (gamepad.axes[5] === 1 && !player.cooldown) {
-		var bullet = new Bullet(player);
-		scene.add(bullet.mesh);
-		bullets.push(bullet);
-		player.cooldown = 20;
-  }	else if (gamepad.buttons[0].pressed)
-		if (switchCooldown === 0){
-			for (var i in players)
-				players[i].switchTrack();
-			switchCooldown = 120;
+			if (switchCooldown === 0){
+				for (var i in players)
+					players[i].switchTrack();
+				switchCooldown = 120;
+		}
+  }	else if (gamepad.buttons[0].pressed){
+			var bullet = new Bullet(player);
+			scene.add(bullet.mesh);
+			bullets.push(bullet);
+			player.cooldown = 20;
 		}
 }
 
@@ -205,7 +228,9 @@ function reset(){
 	initGame();
 }
 
-function updateScore(){
+function updateScore(points){
+	if (points)
+		score += points;
 	UI.innerText = "Score: " + score;
 }
 
