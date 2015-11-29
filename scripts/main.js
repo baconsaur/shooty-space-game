@@ -1,9 +1,15 @@
 var scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x8060F0, 4.5, 8.5);
+scene.fog = new THREE.Fog(0x8060F0, 4.5, 8);
 var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 
-var requestId = 0;
-var difficulty = 0;
+var light1 = new THREE.AmbientLight( 0x303030 );
+var light2 = new THREE.DirectionalLight( 0x404020, 4 );
+var light3 = new THREE.PointLight( 0x4540A0, 3, 120 );
+light2.position.set( 50, 50, 50 );
+light3.position.set( -50, -50, -50 );
+scene.add( light1, light2, light3 );
+
+camera.position.z = 5;
 
 var renderer = new THREE.WebGLRenderer();
 renderer.setSize( window.innerWidth, window.innerHeight );
@@ -11,6 +17,36 @@ document.body.appendChild( renderer.domElement );
 
 var UI = document.createElement('div');
 document.body.appendChild(UI);
+
+var requestId = 0;
+var difficulty = 0;
+
+var worldBounds = new THREE.Mesh( 
+	new THREE.BoxGeometry( window.innerWidth*0.01, window.innerHeight*0.01, 2 ),
+	new THREE.MeshBasicMaterial( {color: 0x00ff00, wireframe: true} )
+);
+
+worldBounds.geometry.computeBoundingBox();
+worldBounds.visible = false;
+scene.add( worldBounds );
+
+var loader = new THREE.JSONLoader();
+
+var playerMesh;
+var loadPlayerMesh = meshLoader('models/box.js');
+
+loadPlayerMesh.then(function(mesh){
+	playerMesh = mesh;
+	initGame();
+});
+
+function meshLoader(meshPath){
+	return new Promise(function(resolve, reject){
+		loader.load(meshPath, function(geometry){
+			resolve(geometry);
+			});
+	});
+}
 
 function initGame() {
 	players = [];
@@ -24,7 +60,6 @@ function initGame() {
 	for (var i=0;i<2;i++) {
 		var ship = new Ship(i);
 		players.push(ship);
-		scene.add(players[i].mesh);
 	}
 	animate();
 }
@@ -34,15 +69,23 @@ function Ship(playerId) {
 	this.alive = true;
 	this.speed = 0.005;
 	this.velocity = new THREE.Vector3(0,0,0);
-	this.geometry = new THREE.CubeGeometry( 0.5,0.5,0.5 ); 
 	if (playerId === 0)
-		this.material = new THREE.MeshPhongMaterial( { color: 0x5050B0 } );
+		this.material = new THREE.MeshPhongMaterial( { color: 0x8040B0 } );
 	else
 		this.material = new THREE.MeshPhongMaterial( { color: 0x50B050 } );
-	this.mesh = new THREE.Mesh( this.geometry, this.material );
-	this.track = playerId;
+
+	this.mesh = new THREE.Mesh(playerMesh, this.material);
 	this.mesh.position.set(0, playerId, -playerId);
+	scene.add(this.mesh);
+
+	this.bbox = new THREE.BoundingBoxHelper(this.mesh);
+	this.bbox.visible = false;
+	scene.add(this.bbox);
+	this.bbox.update();
+
+	this.track = playerId;
 	this.cooldown = 0;
+
 	this.switchTrack = function () {
 		var position = this.mesh.position;
 		if (this.track === 0)
@@ -50,6 +93,7 @@ function Ship(playerId) {
 		else
 			this.track = 0;
 	};
+
 	this.special = function(){
 		var material;
 		if (this.playerId === 0) {
@@ -61,9 +105,7 @@ function Ship(playerId) {
 		scene.add(special.mesh);
 		bullets.push(special);
 	};
-	this.bbox = new THREE.BoundingBoxHelper(this.mesh);
-	scene.add(this.bbox);
-	this.bbox.update();
+
 	this.destroy = function() {
 		scene.remove(this.mesh);
 		scene.remove(this.bbox);
@@ -107,6 +149,7 @@ function Enemy() {
 	this.mesh = new THREE.Mesh(this.geometry, this.material);
 	this.mesh.position.set(10, Math.random()* 6 - 3, Math.floor(Math.random() * 2 - 1));	
 	this.bbox = new THREE.BoundingBoxHelper(this.mesh);
+	this.bbox.visible = false;
 	scene.add(this.bbox);
 	this.bbox.update();
 	this.destroy = function(kill) {
@@ -131,35 +174,6 @@ function spawnEnemy() {
 	scene.add(enemy.mesh);
 	enemies.push(enemy);
 }
-
-function collide(ship, threat){
-	var hit = false;
-	for (var i in threat){
-		if (ship.bbox.box.containsPoint(threat[i].mesh.position))
-			hit = true;
-		else if (threat[i].bbox && ship.bbox.box.isIntersectionBox(threat[i].bbox.box))
-			hit = true;
-
-		if (hit)
-			if (ship.type > 0 && threat[i].special !== ship.type)
-					return;
-			else 
-				if (ship.alive) {
-					ship.alive = false;
-					threat[i].destroy();
-					ship.destroy(true);
-				}
-		}
-}
-
-var light1 = new THREE.AmbientLight( 0x404040 );
-var light2 = new THREE.PointLight( 0x404020, 7, 120 );
-var light3 = new THREE.PointLight( 0x4540A0, 3, 120 );
-light2.position.set( 50, 50, 50 );
-light3.position.set( -50, -50, -50 );
-scene.add( light1, light2, light3 );
-
-camera.position.z = 5;
 
 function checkGamePad(player, gamepad) {
 	if (player.alive) {
@@ -198,10 +212,15 @@ function move(player, gamepad){
 		switchCooldown--;
 
 	checkGamePad(player, gamepad);
-	for (var axis in player.mesh.position)
+
+//	for (var i in player.geometry.vertices)
+//		if (!worldBounds.geometry.boundingBox.containsPoint(player.geometry.vertices[i]))
+//			console.log("out of bounds");
+
+/*	for (var axis in player.mesh.position)
 		if (player.mesh.position[axis] <= -2.5 && player.velocity[axis] < 0 || player.mesh.position[axis] >= 3.3 && player.velocity[axis] > 0)
 			player.velocity[axis] = 0;
-
+*/
 	player.mesh.translateX(player.velocity.x);
 	player.mesh.translateY(player.velocity.y);
 	player.mesh.position.setZ(-player.track);
@@ -229,6 +248,26 @@ function move(player, gamepad){
 	
 	if (player.alive)
 		collide(player, enemies);
+}
+
+function collide(ship, threat){
+	var hit = false;
+	for (var i in threat){
+		if (ship.bbox.box.containsPoint(threat[i].mesh.position))
+			hit = true;
+		else if (threat[i].bbox && ship.bbox.box.isIntersectionBox(threat[i].bbox.box))
+			hit = true;
+
+		if (hit)
+			if (ship.type > 0 && threat[i].special !== ship.type)
+					return;
+			else 
+				if (ship.alive) {
+					ship.alive = false;
+					threat[i].destroy();
+					ship.destroy(true);
+				}
+		}
 }
 
 function reset(){
@@ -271,5 +310,3 @@ function animate() {
 function render() {
 	renderer.render( scene, camera );
 }
-
-initGame();
