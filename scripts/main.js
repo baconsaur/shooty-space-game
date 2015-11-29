@@ -3,10 +3,10 @@ scene.fog = new THREE.Fog(0x8060F0, 4.5, 8);
 var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 
 var light1 = new THREE.AmbientLight( 0x303030 );
-var light2 = new THREE.DirectionalLight( 0x404020, 4 );
+var light2 = new THREE.DirectionalLight( 0x303025, 4 );
 var light3 = new THREE.PointLight( 0x4540A0, 3, 120 );
-light2.position.set( 50, 50, 50 );
-light3.position.set( -50, -50, -50 );
+light2.position.set( 10, 50, 50 );
+light3.position.set( -10, -50, -50 );
 scene.add( light1, light2, light3 );
 
 camera.position.z = 5;
@@ -30,20 +30,29 @@ worldBounds.geometry.computeBoundingBox();
 worldBounds.visible = false;
 scene.add( worldBounds );
 
-var loader = new THREE.JSONLoader();
+var meshLoader = new THREE.JSONLoader();
+var textureLoader = new THREE.TextureLoader();
 
+var playerTextures = [];
 var playerMesh;
-var loadPlayerMesh = meshLoader('models/box.js');
+var loadPlayerMesh = assetLoader(meshLoader, 'models/ship.js');
+var loadPlayer1Texture = assetLoader(textureLoader, 'textures/p1_diff.png');
+var loadPlayer2Texture = assetLoader(textureLoader, 'textures/p2_diff.png');
 
+loadPlayer1Texture.then(function(texture){
+	playerTextures.push(texture);
+}).then(
+loadPlayer2Texture.then(function(texture){
+	playerTextures.push(texture);
+}).then(
 loadPlayerMesh.then(function(mesh){
 	playerMesh = mesh;
-	initGame();
-});
+})).then(initGame));
 
-function meshLoader(meshPath){
+function assetLoader(loader, assetPath){
 	return new Promise(function(resolve, reject){
-		loader.load(meshPath, function(geometry){
-			resolve(geometry);
+			loader.load(assetPath, function(asset){
+			resolve(asset);
 			});
 	});
 }
@@ -69,11 +78,8 @@ function Ship(playerId) {
 	this.alive = true;
 	this.speed = 0.005;
 	this.velocity = new THREE.Vector3(0,0,0);
-	if (playerId === 0)
-		this.material = new THREE.MeshPhongMaterial( { color: 0x8040B0 } );
-	else
-		this.material = new THREE.MeshPhongMaterial( { color: 0x50B050 } );
-
+	this.texture = playerTextures[playerId];
+	this.material = new THREE.MeshPhongMaterial({map:this.texture});
 	this.mesh = new THREE.Mesh(playerMesh, this.material);
 	this.mesh.position.set(0, playerId, -playerId);
 	scene.add(this.mesh);
@@ -213,14 +219,16 @@ function move(player, gamepad){
 
 	checkGamePad(player, gamepad);
 
-//	for (var i in player.geometry.vertices)
-//		if (!worldBounds.geometry.boundingBox.containsPoint(player.geometry.vertices[i]))
+//	for (var i in player.bbox.geometry.vertices)
+//		if (worldBounds.geometry.boundingBox.containsPoint(player.bbox.geometry.vertices[i]))
 //			console.log("out of bounds");
-
-/*	for (var axis in player.mesh.position)
-		if (player.mesh.position[axis] <= -2.5 && player.velocity[axis] < 0 || player.mesh.position[axis] >= 3.3 && player.velocity[axis] > 0)
+	var bounds = worldBounds.geometry.boundingBox;
+	for (var axis in player.mesh.position)
+		if (player.mesh.position[axis] <= bounds.min[axis] && player.velocity[axis] < 0 || player.mesh.position[axis] >= bounds.max[axis] && player.velocity[axis] > 0)
 			player.velocity[axis] = 0;
-*/
+
+	player.mesh.rotation.x = -player.velocity.y*1.5;
+
 	player.mesh.translateX(player.velocity.x);
 	player.mesh.translateY(player.velocity.y);
 	player.mesh.position.setZ(-player.track);
