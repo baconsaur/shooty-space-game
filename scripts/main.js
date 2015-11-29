@@ -1,4 +1,5 @@
 var scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x8060F0, 4.5, 8.5);
 var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 
 var requestId = 0;
@@ -50,16 +51,13 @@ function Ship(playerId) {
 			this.track = 0;
 	};
 	this.special = function(){
-		var geometry;
 		var material;
 		if (this.playerId === 0) {
-			geometry = new THREE.SphereGeometry(0.15, 32, 32);
-			material = new THREE.MeshPhongMaterial({color:0xFF0000});
+			material = new THREE.PointsMaterial({color:0xFF0000, size:0.8});
 		} else {
-			geometry = new THREE.SphereGeometry(0.15, 32, 32);
-			material = new THREE.MeshPhongMaterial({color:0xFFFF00});
+			material = new THREE.PointsMaterial({color:0x0000FF, size:0.8});
 		}
-		var special = new Bullet(this, geometry, material, this.playerId);
+		var special = new Bullet(this, material, this.playerId);
 		scene.add(special.mesh);
 		bullets.push(special);
 	};
@@ -72,14 +70,15 @@ function Ship(playerId) {
 	};
 }
 
-function Bullet(player, geometry, material, playerId){
+function Bullet(player, material, playerId){
 	if (typeof playerId === 'number')
 		this.special = playerId + 1;
 	else
 		this.special = 0;
-	this.geometry = geometry || new THREE.CubeGeometry(0.1,0.1,0.1);
-	this.material = material || new THREE.MeshPhongMaterial({color:0xFFFFFF});
-	this.mesh = new THREE.Mesh(this.geometry, this.material);
+	this.geometry = new THREE.Geometry();
+	this.geometry.vertices.push(new THREE.Vector3());
+	this.material = material || new THREE.PointsMaterial({color:0xFFFFFF, size:0.4});
+	this.mesh = new THREE.Points(this.geometry, this.material);
 	this.mesh.position.copy(player.mesh.position);
 	this.speed = 0.1;
 	this.destroy = function() {
@@ -144,13 +143,12 @@ function collide(ship, threat){
 		if (hit)
 			if (ship.type > 0 && threat[i].special !== ship.type)
 					return;
-			else {
+			else 
 				if (ship.alive) {
 					ship.alive = false;
 					threat[i].destroy();
 					ship.destroy(true);
 				}
-			}
 		}
 }
 
