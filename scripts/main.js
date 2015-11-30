@@ -1,5 +1,5 @@
 var scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x8060F0, 4.5, 7);
+scene.fog = new THREE.Fog(0x8060F0, 4.5, 9);
 var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 
 var light1 = new THREE.AmbientLight( 0x303030 );
