@@ -18,6 +18,8 @@ canvas {
 div {
 	position:absolute;
 	top:0;
-	left:0;
-	color:#FFF;
+	right:10px;
+	color:#FF7700;
+	font-size:3em;
+	font-family: 'Alegreya Sans SC', sans-serif;
 }
