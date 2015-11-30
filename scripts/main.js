@@ -12,6 +12,7 @@ scene.add( light1, light2, light3 );
 camera.position.z = 5;
 
 var renderer = new THREE.WebGLRenderer();
+renderer.setClearColor( 0x000040 );
 renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
 
@@ -116,13 +117,13 @@ function Ship(playerId) {
 	};
 
 	this.special = function(){
-		var material;
+		var color;
 		if (this.playerId === 0) {
-			material = new THREE.PointsMaterial({color:0xFF0000, size:0.8});
+			color = 0xFF0000;
 		} else {
-			material = new THREE.PointsMaterial({color:0x0000FF, size:0.8});
+			color = 0x0000FF;
 		}
-		var special = new Bullet(this, material, this.playerId);
+		var special = new Bullet(this, color, this.playerId);
 		scene.add(special.mesh);
 		bullets.push(special);
 	};
@@ -133,21 +134,57 @@ function Ship(playerId) {
 	};
 }
 
-function Bullet(player, material, playerId){
+function Bullet(player, color, playerId){
 	if (typeof playerId === 'number')
 		this.special = playerId + 1;
 	else
 		this.special = 0;
-	this.geometry = new THREE.Geometry();
-	this.geometry.vertices.push(new THREE.Vector3());
-	this.material = material || new THREE.PointsMaterial({color:0xFFFFFF, size:0.4});
-	this.mesh = new THREE.Points(this.geometry, this.material);
+	this.material = new THREE.SpriteMaterial( {
+		map: new THREE.CanvasTexture( generateSprite(this.special, color) ),
+		blending: THREE.AdditiveBlending
+	} );
+	this.mesh = new THREE.Sprite(this.material);
+	if (this.special === 0){
+		this.mesh.scale.x = 0.5;
+		this.mesh.scale.y = 0.5;
+	}
 	this.mesh.position.copy(player.mesh.position);
+	this.mesh.position.z -= 0.1;
 	this.speed = 0.1;
 	this.destroy = function() {
 		scene.remove(this.mesh);
 		bullets.splice(bullets.indexOf(this),1);
 	};
+}
+
+function generateSprite(special) {
+	var canvas = document.createElement( 'canvas' );
+	canvas.width = 16;
+	canvas.height = 16;
+
+	var context = canvas.getContext( '2d' );
+	var gradient = context.createRadialGradient( canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width / 2 );
+	if (special === 0) {
+		gradient.addColorStop( 0, 'rgba(255,255,255,1)' );
+		gradient.addColorStop( 0.2, 'rgba(255,255,100,1)' );
+		gradient.addColorStop( 0.4, 'rgba(32,32,10,1)' );
+		gradient.addColorStop( 1, 'rgba(0,0,0,1)' );
+	} else if (special === 1) {
+		gradient.addColorStop( 0, 'rgba(255,255,150,1)' );
+		gradient.addColorStop( 0.2, 'rgba(255,100,0,1)' );
+		gradient.addColorStop( 0.4, 'rgba(64,0,0,1)' );
+		gradient.addColorStop( 1, 'rgba(0,0,0,1)' );
+	} else {
+		gradient.addColorStop( 0, 'rgba(255,255,255,1)' );
+		gradient.addColorStop( 0.2, 'rgba(0,255,255,1)' );
+		gradient.addColorStop( 0.4, 'rgba(0,10,64,1)' );
+		gradient.addColorStop( 1, 'rgba(0,0,0,1)' );
+	}
+	context.fillStyle = gradient;
+	context.fillRect( 0, 0, canvas.width, canvas.height );
+
+	return canvas;
+
 }
 
 function Enemy() {
@@ -194,7 +231,7 @@ function Enemy() {
 }
 
 function shieldBubble(enemy, color){
-	var material = new THREE.MeshPhongMaterial({color:0x575757, emissive:color, specular:0xFFFFFF, shininess:100, transparent: true, opacity:0.3});
+	var material = new THREE.MeshPhongMaterial({blending: THREE.AdditiveBlending, color:0x575757, emissive:color, specular:0xFFFFFF, shininess:100, transparent: true, opacity:0.3});
 	var geometry = new THREE.SphereGeometry(0.5, 32, 32);
 	enemy.shield = new THREE.Mesh(geometry, material);
 	enemy.shield.position.copy(enemy.mesh.position);
