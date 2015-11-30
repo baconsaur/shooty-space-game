@@ -1,5 +1,5 @@
 var scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x8060F0, 4.5, 8);
+scene.fog = new THREE.Fog(0x8060F0, 4.5, 7);
 var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 
 var light1 = new THREE.AmbientLight( 0x303030 );
@@ -22,7 +22,7 @@ var requestId = 0;
 var difficulty = 0;
 
 var worldBounds = new THREE.Mesh( 
-	new THREE.BoxGeometry( window.innerWidth*0.01, window.innerHeight*0.01, 2 ),
+	new THREE.BoxGeometry( window.innerWidth*0.007, window.innerHeight*0.007, 2 ),
 	new THREE.MeshBasicMaterial( {color: 0x00ff00, wireframe: true} )
 );
 
@@ -33,28 +33,43 @@ scene.add( worldBounds );
 var meshLoader = new THREE.JSONLoader();
 var textureLoader = new THREE.TextureLoader();
 
-var playerTextures = [];
+var loadModels = assetLoader(meshLoader, ['models/ship.js', 'models/asteroid.js']);
+
+var background = [];
 var playerMesh;
-var loadPlayerMesh = assetLoader(meshLoader, 'models/ship.js');
-var loadPlayer1Texture = assetLoader(textureLoader, 'textures/p1_diff.png');
-var loadPlayer2Texture = assetLoader(textureLoader, 'textures/p2_diff.png');
+var enemyMesh;
+var allTextures;
+var height = window.innerHeight*0.02;
 
-loadPlayer1Texture.then(function(texture){
-	playerTextures.push(texture);
-}).then(
-loadPlayer2Texture.then(function(texture){
-	playerTextures.push(texture);
-}).then(
-loadPlayerMesh.then(function(mesh){
-	playerMesh = mesh;
-})).then(initGame));
+Promise.all(loadModels).then(function(meshes){
+	playerMesh = meshes[0];
+	enemyMesh = meshes[1];
+	var loadTextures = assetLoader(textureLoader, ['textures/p1_diff.png', 'textures/p2_diff.png', 'textures/asteroid_diff.png', 'textures/background.png']);
+	Promise.all(loadTextures).then(function(textures){
+		allTextures = textures;
+			var plane = new THREE.PlaneGeometry(height * 2, height);
+			var planeMaterial = new THREE.MeshBasicMaterial({fog: false, map:allTextures[3]});
+			background.push(new THREE.Mesh(plane, planeMaterial));
+			background.push(background[0].clone());
+			background[0].position.set(0,0,-5);
+			background[1].position.set(height * 2,0,-5);
+			scene.add(background[0], background[1]);
+	}).then(initGame);
+});
 
-function assetLoader(loader, assetPath){
-	return new Promise(function(resolve, reject){
-			loader.load(assetPath, function(asset){
-			resolve(asset);
-			});
-	});
+function assetLoader(loader, assetPaths){
+	var assets = [];
+	for (var i in assetPaths)
+		assets.push(getPromise(assetPaths[i]));
+
+	function getPromise(assetPath){
+		return new Promise(function(resolve, reject){
+				loader.load(assetPath, function(asset){
+				resolve(asset);
+				});
+		});
+	}
+	return assets;
 }
 
 function initGame() {
@@ -78,10 +93,10 @@ function Ship(playerId) {
 	this.alive = true;
 	this.speed = 0.005;
 	this.velocity = new THREE.Vector3(0,0,0);
-	this.texture = playerTextures[playerId];
+	this.texture = allTextures[playerId];
 	this.material = new THREE.MeshPhongMaterial({map:this.texture});
 	this.mesh = new THREE.Mesh(playerMesh, this.material);
-	this.mesh.position.set(0, playerId, -playerId);
+	this.mesh.position.set(worldBounds.geometry.boundingBox.min.x/3 *2, playerId*2-1, -playerId);
 	scene.add(this.mesh);
 
 	this.bbox = new THREE.BoundingBoxHelper(this.mesh);
@@ -136,31 +151,32 @@ function Bullet(player, material, playerId){
 }
 
 function Enemy() {
+	this.material = new THREE.MeshLambertMaterial({map:allTextures[2]});	
+	this.mesh = new THREE.Mesh(enemyMesh, this.material);
+	this.mesh.position.set(worldBounds.geometry.boundingBox.max.x+3, Math.random()* 6 - 3, Math.floor(Math.random() * 2 - 1));
 	var typeCheck = Math.floor(Math.random()*5);
-	var color;
 	if (typeCheck === 1) {
 		this.type = 1;
-		color = 0xFF0000;
+		shieldBubble(this, 0xFF0000);
 	} else if (typeCheck === 2) {
 		this.type = 2;
-		color = 0x0000FF;
+		shieldBubble(this, 0x0000FF);
 	} else {
 		this.type = 0;
-		color = 0x404040;
 	}
-	this.alive = true;
-	this.speed = 0.02;
-	this.geometry = new THREE.IcosahedronGeometry(0.5, 0);
-	this.material = new THREE.MeshPhongMaterial({color:color});
-	this.mesh = new THREE.Mesh(this.geometry, this.material);
-	this.mesh.position.set(10, Math.random()* 6 - 3, Math.floor(Math.random() * 2 - 1));	
+
 	this.bbox = new THREE.BoundingBoxHelper(this.mesh);
 	this.bbox.visible = false;
 	scene.add(this.bbox);
 	this.bbox.update();
+	
+	this.alive = true;
+	this.speed = 0.02;
+	
 	this.destroy = function(kill) {
 		scene.remove(this.mesh);
 		scene.remove(this.bbox);
+		scene.remove(this.shield);
 		enemies.splice(enemies.indexOf(this),1);
 		if (kill)
 			updateScore(10);
@@ -169,10 +185,20 @@ function Enemy() {
 	};
 	this.movement = function() {
 		this.mesh.translateX(-this.speed - (difficulty * 0.005));
-		if (this.mesh.position.x <= -10)
+		if (this.type > 0)
+			this.shield.translateX(-this.speed - (difficulty * 0.005));
+		if (this.mesh.position.x <= worldBounds.geometry.boundingBox.min.x - 3)
 			this.destroy();
 		collide(this, bullets);
 	};
+}
+
+function shieldBubble(enemy, color){
+	var material = new THREE.MeshPhongMaterial({color:0x575757, emissive:color, specular:0xFFFFFF, shininess:100, transparent: true, opacity:0.3});
+	var geometry = new THREE.SphereGeometry(0.5, 32, 32);
+	enemy.shield = new THREE.Mesh(geometry, material);
+	enemy.shield.position.copy(enemy.mesh.position);
+	scene.add(enemy.shield);
 }
 
 function spawnEnemy() {
@@ -219,9 +245,6 @@ function move(player, gamepad){
 
 	checkGamePad(player, gamepad);
 
-//	for (var i in player.bbox.geometry.vertices)
-//		if (worldBounds.geometry.boundingBox.containsPoint(player.bbox.geometry.vertices[i]))
-//			console.log("out of bounds");
 	var bounds = worldBounds.geometry.boundingBox;
 	for (var axis in player.mesh.position)
 		if (player.mesh.position[axis] <= bounds.min[axis] && player.velocity[axis] < 0 || player.mesh.position[axis] >= bounds.max[axis] && player.velocity[axis] > 0)
@@ -305,6 +328,11 @@ function animate() {
 		var gamepad = navigator.getGamepads()[i];
 		move(players[i], gamepad);
 	}	
+	for (var j in background){
+		background[j].translateX(-0.05);
+		if (background[j].position.x <= -height*2)
+			background[j].position.x = height*2;
+	}
 	if (!players[0].alive && !players[1].alive){
 		cancelAnimationFrame(requestId);
 		reset();
