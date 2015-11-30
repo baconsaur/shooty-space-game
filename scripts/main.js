@@ -1,3 +1,10 @@
+var bgm = new Audio('sound/Camazotz.mp3');
+var laser1 = new Audio('sound/laser1.wav');
+var laser2 = new Audio('sound/laser2.wav');
+var explode = new Audio('sound/explode.wav');
+var woosh = new Audio('sound/woosh.wav');
+var shieldHit = new Audio('sound/shield.wav');
+
 var scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x8060F0, 4.5, 9);
 var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
@@ -74,6 +81,8 @@ function assetLoader(loader, assetPaths){
 }
 
 function initGame() {
+	bgm.currentTime = 0;
+	bgm.play();	
 	players = [];
 	bullets = [];
 	enemies = [];
@@ -95,7 +104,7 @@ function Ship(playerId) {
 	this.speed = 0.005;
 	this.velocity = new THREE.Vector3(0,0,0);
 	this.texture = allTextures[playerId];
-	this.material = new THREE.MeshPhongMaterial({map:this.texture});
+	this.material = new THREE.MeshPhongMaterial({map:this.texture, shininess:100});
 	this.mesh = new THREE.Mesh(playerMesh, this.material);
 	this.mesh.position.set(worldBounds.geometry.boundingBox.min.x/3 *2, playerId*2-1, -playerId);
 	scene.add(this.mesh);
@@ -257,10 +266,12 @@ function checkGamePad(player, gamepad) {
 			player.velocity.y = 0;
 
 		if (gamepad.buttons[1].pressed && !player.cooldown) {
+			laser2.play();
 			player.special();
 			player.cooldown = 70;
 		} else if (gamepad.axes[5] === 1 && !player.cooldown) {
 			if (switchCooldown === 0){
+				woosh.play();
 				for (var i in players)
 					players[i].switchTrack();
 				switchCooldown = 120;
@@ -268,6 +279,7 @@ function checkGamePad(player, gamepad) {
 		}	else if (gamepad.buttons[0].pressed && !player.cooldown){
 			var bullet = new Bullet(player);
 			scene.add(bullet.mesh);
+			laser1.play();
 			bullets.push(bullet);
 			player.cooldown = 20;
 		}
@@ -327,12 +339,14 @@ function collide(ship, threat){
 			hit = true;
 
 		if (hit)
-			if (ship.type > 0 && threat[i].special !== ship.type)
-					return;
-			else 
+			if (ship.type > 0 && threat[i].special !== ship.type){
+				shieldHit.play();	
+				return;
+			} else 
 				if (ship.alive) {
 					ship.alive = false;
 					threat[i].destroy();
+					explode.play();
 					ship.destroy(true);
 				}
 		}
