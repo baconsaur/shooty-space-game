@@ -47,6 +47,7 @@ function Ship(playerId) {
 	};
 
 	this.destroy = function() {
+		explosions.push(new Explosion(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z));
 		scene.remove(this.mesh);
 		scene.remove(this.bbox);
 	};

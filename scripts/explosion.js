@@ -1,28 +1,31 @@
 function Explosion(x, y, z) {
-  var speed = 1;
+  var speed = 0.8;
   var particleCount = 100;
   var sprite = new THREE.CanvasTexture(explosionSprite());
   var direction = [];
+  var particles = [];
 
-  var geometry = new THREE.Geometry();
+  var material = new THREE.SpriteMaterial( {
+    fog: false,
+    blending: THREE.AdditiveBlending,
+    map: sprite
+  } );
 
   for (i = 0; i < particleCount; i ++)
   {
-    var vertex = new THREE.Vector3();
-    vertex.x = x;
-    vertex.y = y;
-    vertex.z = z;
+    var point = new THREE.Sprite(material);
 
-    geometry.vertices.push( vertex );
+    point.position.set(x,y,z);
+
+    //point.scale.set(0.3,0.3,0.3);
+    //point.position.set(new THREE.Vector3(x,y,z));
+
+    particles.push(point);
+
     direction.push({x:(Math.random() * speed)-(speed/2),y:(Math.random() * speed)-(speed/2),z:(Math.random() * speed)-(speed/2)});
+
+    scene.add( point );
   }
-  var material = new THREE.PointsMaterial( {
-    fog: false,
-    size: 0.3,
-    blending: THREE.AdditiveBlending,
-		map: sprite
-	} );
-  var particles = new THREE.Points( geometry, material );
 
   this.object = particles;
   this.status = true;
@@ -31,23 +34,20 @@ function Explosion(x, y, z) {
   this.yDir = (Math.random() * speed)-(speed/2);
   this.zDir = (Math.random() * speed)-(speed/2);
 
-  scene.add( this.object );
-
   this.update = function(){
     if (this.status){
       var pCount = particleCount;
       while(pCount--) {
-        var particle =  this.object.geometry.vertices[pCount];
-        particle.y += direction[pCount].y;
-        particle.x += direction[pCount].x;
-        this.object.material.size -= 0.0001;
-        if (this.object.material.size <= 0) {
-          scene.remove(this.object);
-          explosions.splice(explosions.indexOf(this), 1);
+        var particle = this.object[pCount];
+        particle.position.y += direction[pCount].y;
+        particle.position.x += direction[pCount].x;
+        particle.position.z += direction[pCount].z;
+        particle.scale.x = particle.scale.y *= 0.6;
+        if (particle.position.y > worldBounds.geometry.boundingBox.max.y * 2) {
+           scene.remove(this.object);
+           explosions.splice(explosions.indexOf(this), 1);
         }
-        //particle.z += direction[pCount].z;
       }
-      this.object.geometry.verticesNeedUpdate = true;
     }
   };
 }
