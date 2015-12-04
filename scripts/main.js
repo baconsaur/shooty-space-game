@@ -3,18 +3,33 @@ scene.fog = new THREE.Fog(0x8060F0, 4.5, 9);
 var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 
 var light1 = new THREE.AmbientLight( 0x303030 );
-var light2 = new THREE.DirectionalLight( 0x303025, 4 );
-var light3 = new THREE.PointLight( 0x4540A0, 3, 120 );
+var light2 = new THREE.DirectionalLight( 0x303025, 4.5 );
+var light3 = new THREE.PointLight( 0x4540A0, 2, 120 );
 light2.position.set( 10, 50, 50 );
-light3.position.set( -10, -50, -50 );
+light3.position.set( -20, -50, -20 );
 scene.add( light1, light2, light3 );
 
 camera.position.z = 5;
 
 var renderer = new THREE.WebGLRenderer();
-renderer.setClearColor( 0x000040 );
+renderer.setClearColor( 0x000000 );
 renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
+
+//Post-processing
+composer = new THREE.EffectComposer( renderer );
+composer.addPass( new THREE.RenderPass( scene, camera ) );
+
+var bloomPass = new THREE.BloomPass(1.8, 10, 0.5, 1024);
+//var edgeShader = new THREE.ShaderPass(THREE.EdgeShader);
+var effectCopy = new THREE.ShaderPass(THREE.CopyShader);
+effectCopy.renderToScreen = true;
+
+composer.addPass( new THREE.RenderPass( scene, camera ) );
+//composer.addPass(edgeShader);
+composer.addPass(bloomPass);
+composer.addPass(effectCopy);
+
 
 var UI = document.createElement('div');
 document.body.appendChild(UI);
@@ -38,6 +53,7 @@ function initGame() {
 	bullets = [];
 	enemies = [];
 	gamepads = [];
+	explosions = [];
 	spawnCount = 600;
 	score = 0;
 	difficulty = 0;
@@ -221,10 +237,14 @@ function animate() {
 		return;
 	}
 
+	for (var explosion in explosions)
+	explosions[explosion].update();
+
 	render();
 	requestId = requestAnimationFrame( animate );
 }
 
 function render() {
-	renderer.render( scene, camera );
+	//renderer.render( scene, camera );
+	composer.render();
 }

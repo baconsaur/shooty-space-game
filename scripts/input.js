@@ -82,7 +82,7 @@ function checkKeys(key, down){
 			else
 				players[1].right = 0;
 			break;
-		case 70:
+		case 68:
 			if (down)
 				players[1].up = speed;
 			else

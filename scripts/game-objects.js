@@ -133,9 +133,11 @@ function Enemy() {
 		scene.remove(this.bbox);
 		scene.remove(this.shield);
 		enemies.splice(enemies.indexOf(this),1);
-		if (kill)
+		if (kill) {
+			explosions.push(new Explosion(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z));
+			console.log(explosions);
 			updateScore(10);
-		else
+		} else
 			updateScore(-10);
 	};
 	this.movement = function() {
@@ -149,7 +151,7 @@ function Enemy() {
 }
 
 function shieldBubble(enemy, color){
-	var material = new THREE.MeshPhongMaterial({blending: THREE.AdditiveBlending, color:0x575757, emissive:color, specular:0xFFFFFF, shininess:100, transparent: true, opacity:0.3});
+	var material = new THREE.MeshPhongMaterial({blending: THREE.AdditiveBlending, color:0x575757, emissive:color, specular:0xFFFFFF, shininess:100, transparent: true, opacity:0.2});
 	var geometry = new THREE.SphereGeometry(0.5, 32, 32);
 	enemy.shield = new THREE.Mesh(geometry, material);
 	enemy.shield.position.copy(enemy.mesh.position);
